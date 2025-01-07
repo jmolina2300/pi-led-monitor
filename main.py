@@ -10,6 +10,13 @@ PIN_STATUS_UV = 8
 
 transition = 0
 
+
+# Report details
+badge_details = [True, 12345, 'JOHN DOE']
+time_uv_leds = [None, None]
+time_green_led = [None, None]
+time_red_led = [None, None]
+
 # Set up GPIO mode
 GPIO.setmode(GPIO.BOARD)
 
@@ -32,6 +39,9 @@ def uv_led_detected(channel):
         on_off_status = 'ON'  # The LEDs were OFF but got turned on
         if transition == 0:
             transition = 1
+            time_uv_leds[0] = get_current_time()
+            time_green_led[1] = time_uv_leds[0]
+            time_red_led[0] = time_uv_leds[0]
         else:
             # Something weird happened, reset.
             transition = 0
@@ -39,17 +49,68 @@ def uv_led_detected(channel):
         on_off_status = 'OFF' # The LEDs were ON but got turned OFF
         if transition == 1:
             transition = 0
+            time_uv_leds[1] = get_current_time()
+            time_green_led[0] = time_uv_leds[1]
+            time_red_led[1] = time_uv_leds[1]
             cycle_complete = True
         else:
             # Something weird happened, reset.
             transition = 0 
 
-    print(f"UV LEDs {on_off_status}: ", get_current_time())
-    
+    #print(f"UV LEDs {on_off_status}: ", get_current_time())
     if cycle_complete:
-        print(f"Cycle Complete.\n")
-    
+        new_report = create_report(badge_details, time_uv_leds,time_green_led, time_red_led)
+        print(new_report)
 
+"""
+is_cycle_complete
+
+Tells if a cycle was complete based on the duration (~35 seconds).
+Placeholder.
+
+"""
+def is_complete_cycle(duration):
+    if duration >= 25:
+        return True
+    else:
+        return False
+
+
+"""
+create_report
+
+Creates a report with the badge ID, the time ON/OFF for all  LEDs and 
+any other information required.
+
+
+Parameter format:
+  badge_details[badge_id_read, badge_id, badge_name]
+  time_uv_leds[time_ON, time_OFF]
+  time_green_led[time_ON, time_OFF]
+  time_red_led[time_ON, time_OFF]
+
+"""
+def create_report(badge_details,time_uv_leds, time_green_led, time_red_led):
+    current_time = get_current_time()
+    cycle_time = (time_uv_leds[1] - time_uv_leds[0]).total_seconds()
+    complete_cycle = is_complete_cycle(cycle_time)
+    report = '************************************************\n'
+    report += f"Date: {current_time}\n"
+    report += f"Badge ID Read: {badge_details[0]}\n"
+    report += f"Badge ID Number: {badge_details[1]}\n"
+    report += f"Name: {badge_details[2]}\n"
+    report += '************************************************\n'
+    report += f"Upper LEDs ON: {time_uv_leds[0]}\n"
+    report += f"Upper LEDs OFF: {time_uv_leds[1]}\n"
+    report += f"Door Green LED ON: {time_green_led[0]}\n"
+    report += f"Door Green LED OFF: {time_green_led[1]}\n"
+    report += f"Door Red LED ON: {time_red_led[0]}\n"
+    report += f"Door Red LED OFF: {time_red_led[1]}\n"
+    report += '************************************************\n'
+    report += f"Cycle complete: {complete_cycle}\n"
+    report += f"Cycle time: {cycle_time}\n\n"
+    return report
+    
 
 
 
@@ -89,8 +150,11 @@ def get_state(pin):
     return GPIO.input(pin)
 
 
-def get_current_time():
+def get_current_time_iso():
     return datetime.now().replace(microsecond=0).isoformat()
+    
+def get_current_time():
+    return datetime.now().replace(microsecond=0)
 
 
 def test_LED():
