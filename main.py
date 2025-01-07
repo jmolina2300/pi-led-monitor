@@ -126,7 +126,7 @@ def main(debug=False):
     
     
     # Setup the card reader by instantiating a CardReader
-    card_reader = CardReader()
+    card_reader = CardReader(debug=False)
     
     print('Waiting for a card...')
     try:

@@ -23,15 +23,18 @@ import pcprox
 
 
 class CardReader:
-    def __init__(self):
-        self.dev = pcprox.open_pcprox(debug=False)
+    def __init__(self, debug):
+        self.dev = pcprox.open_pcprox(debug=debug)
 
         # Show the device info
         #print(repr(dev.get_device_info()))
 
-        # Dump the configuration from the device.
+        # Get the device configuration
         self.config = self.dev.get_config()
-        self.config.print_config()
+        
+        # Dump the configuration from the device if debug enabled
+        if debug:
+            self.config.print_config()
 
         # Disable sending keystrokes and update config
         self.config.bHaltKBSnd = True
