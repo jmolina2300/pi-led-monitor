@@ -5,8 +5,10 @@ from datetime import datetime
 from cardreader import CardReader
 
 # Define pin names
-PIN_DEVICE_POWER = 7
-PIN_STATUS_UV = 8
+PIN_STATUS_DEVICE = 32
+PIN_STATUS_UV = 36
+PIN_STATUS_DOOR_RED = 38
+PIN_STATUS_DOOR_GREEN = 40
 
 transition = 0
 
@@ -20,11 +22,13 @@ time_red_led = [None, None]
 # Set up GPIO mode
 GPIO.setmode(GPIO.BOARD)
 
-# Set GPIO pin 7 as an output pin
-GPIO.setup(PIN_DEVICE_POWER, GPIO.OUT)
 
-# Set GPIO pin 8 as an input PULLUP pin
+
+# Set GPIO pin modes
+GPIO.setup(PIN_STATUS_DEVICE, GPIO.IN, pull_up_down=GPIO.PUD_UP)
 GPIO.setup(PIN_STATUS_UV, GPIO.IN, pull_up_down=GPIO.PUD_UP)
+GPIO.setup(PIN_STATUS_DOOR_RED, GPIO.IN, pull_up_down=GPIO.PUD_UP)
+GPIO.setup(PIN_STATUS_DOOR_GREEN, GPIO.IN, pull_up_down=GPIO.PUD_UP)
 
 
 
