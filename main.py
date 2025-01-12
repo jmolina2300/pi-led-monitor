@@ -15,6 +15,7 @@ transition = 0
 
 # Report details
 badge_details = [True, 12345, 'JOHN DOE']
+time_device_active = [None,None]
 time_uv_leds = [None, None]
 time_green_led = [None, None]
 time_red_led = [None, None]
@@ -33,19 +34,20 @@ GPIO.setup(PIN_STATUS_DOOR_GREEN, GPIO.IN, pull_up_down=GPIO.PUD_UP)
 
 
 # Define the interrupt callback function
-def uv_led_detected(channel):
+def int_device_active(channel):
+    
+    time.sleep(0.5)
     global transition  # a Reference to the same variable above
     cycle_complete = False
     
-    state_uv_cur = GPIO.input(PIN_STATUS_UV)
+    state_dev_cur = GPIO.input(PIN_STATUS_DEVICE)
     on_off_status = ''
-    if state_uv_cur == GPIO.LOW:
+    if state_dev_cur == GPIO.LOW:
         on_off_status = 'ON'  # The LEDs were OFF but got turned on
         if transition == 0:
             transition = 1
-            time_uv_leds[0] = get_current_time()
-            time_green_led[1] = time_uv_leds[0]
-            time_red_led[0] = time_uv_leds[0]
+            time_device_active[0] = get_current_time()
+            print('Cycle started...')
         else:
             # Something weird happened, reset.
             transition = 0
@@ -53,9 +55,7 @@ def uv_led_detected(channel):
         on_off_status = 'OFF' # The LEDs were ON but got turned OFF
         if transition == 1:
             transition = 0
-            time_uv_leds[1] = get_current_time()
-            time_green_led[0] = time_uv_leds[1]
-            time_red_led[1] = time_uv_leds[1]
+            time_device_active[1] = get_current_time()
             cycle_complete = True
         else:
             # Something weird happened, reset.
@@ -65,6 +65,50 @@ def uv_led_detected(channel):
     if cycle_complete:
         new_report = create_report(badge_details, time_uv_leds,time_green_led, time_red_led)
         print(new_report)
+        clear_report_details()
+
+
+def int_led_uv(channel):
+    state_led_uv = GPIO.input(PIN_STATUS_UV)
+    if state_led_uv == GPIO.LOW:
+        time_uv_leds[0] = get_current_time()
+    else:
+        time_uv_leds[1] = get_current_time()
+    
+
+def int_door_led_green(channel):
+    state_led = GPIO.input(PIN_STATUS_DOOR_GREEN)
+    if state_led == GPIO.LOW:
+        time_green_led[0] = get_current_time()
+    else:
+        time_green_led[1] = get_current_time()
+
+
+def int_door_led_red(channel):
+    state_led = GPIO.input(PIN_STATUS_DOOR_RED)
+    if state_led == GPIO.LOW:
+        time_red_led[0] = get_current_time()
+    else:
+        time_red_led[1] = get_current_time()
+
+
+# Set up an interrupt for rising OR falling edge
+GPIO.add_event_detect(PIN_STATUS_DEVICE, GPIO.BOTH, callback=int_device_active, bouncetime=300)
+GPIO.add_event_detect(PIN_STATUS_UV, GPIO.BOTH, callback=int_led_uv, bouncetime=300)
+GPIO.add_event_detect(PIN_STATUS_DOOR_GREEN, GPIO.BOTH, callback=int_door_led_green, bouncetime=300)
+GPIO.add_event_detect(PIN_STATUS_DOOR_RED, GPIO.BOTH, callback=int_door_led_red, bouncetime=300)
+
+
+"""
+clear_report_details
+"""
+def clear_report_details():
+    badge_details = [True, 12345, 'JOHN DOE']
+    time_device_active = [None, None]
+    time_uv_leds = [None, None]
+    time_green_led = [None, None]
+    time_red_led = [None, None]
+
 
 """
 is_cycle_complete
@@ -96,7 +140,7 @@ Parameter format:
 """
 def create_report(badge_details,time_uv_leds, time_green_led, time_red_led):
     current_time = get_current_time()
-    cycle_time = (time_uv_leds[1] - time_uv_leds[0]).total_seconds()
+    cycle_time = (time_device_active[1] - time_device_active[0]).total_seconds()
     complete_cycle = is_complete_cycle(cycle_time)
     report = '************************************************\n'
     report += f"Date: {current_time}\n"
@@ -115,12 +159,6 @@ def create_report(badge_details,time_uv_leds, time_green_led, time_red_led):
     report += f"Cycle time: {cycle_time}\n\n"
     return report
     
-
-
-
-# Set up an interrupt for rising OR falling edge
-GPIO.add_event_detect(PIN_STATUS_UV, GPIO.BOTH, callback=uv_led_detected, bouncetime=300)
-
 
 
 def main(debug=False):
