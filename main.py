@@ -20,78 +20,23 @@ state = None
 previous_state = None
 device_active = False
 
+state_door_green_led = 0
+state_door_green_led_prev = 0
+
+state_door_red_led = 0
+state_door_red_led_prev = 0
+
+door_green_led_need_transition = False
+door_red_led_need_transition = False
+uv_led_need_transition = False
+
+
+status_uv_leds = None
+status_uv_leds_prev = None
+
+
 # Card Reader to be used
 card_reader = None
-
-
-def exit_state(old_state,new_state):
-    pass
-
-
-def enter_state(new_state,old_state):
-    if new_state == IDLE:
-        print('Idling')
-    elif new_state == DISINFECTING:
-        print('Disinfecting')
-
-
-def get_transition():
-    global state
-    global device_active
-    # Figure out what to do next based on state variables
-    if state == IDLE:
-        if device_active == True:
-            return DISINFECTING
-    elif state == DISINFECTING:
-        if device_active == False:
-            return IDLE
-    
-    return None
-
-
-def state_logic():
-    global state
-    
-    _check_device_status()
-    if state == IDLE:
-        _idle()
-    elif state == DISINFECTING:
-        _disinfecting()
-
-
-def set_state(new_state):
-    global state
-    previous_state = state
-    state = new_state
-    if previous_state != None:
-        exit_state(previous_state, new_state)
-    if new_state != None:
-        enter_state(new_state, previous_state)
-
-
-def _idle():
-    global card_reader
-    
-    # Scan for tags forever
-    tag = card_reader.scan_for_tags()
-    
-    # If we got a tag, print it out
-    if tag is not None:
-        print('Tag data: %s' % pcprox._format_hex(tag[0]))
-        print('Bit length: %d' % tag[1])
-    time.sleep(0.5)
-
-def _disinfecting():
-    pass
-
-def _check_device_status():
-    global device_active
-    if GPIO.input(PIN_STATUS_DEVICE) == GPIO.LOW:
-        device_active = True
-    else:
-        device_active = False
-        
-
 
 
 # Report details
@@ -114,70 +59,153 @@ GPIO.setup(PIN_STATUS_DOOR_GREEN, GPIO.IN, pull_up_down=GPIO.PUD_UP)
 
 
 
-# Define the interrupt callback function
-def int_device_active(channel):
-    
-    time.sleep(0.5)
-    global transition  # a Reference to the same variable above
-    cycle_complete = False
-    
-    state_dev_cur = GPIO.input(PIN_STATUS_DEVICE)
-    on_off_status = ''
-    if state_dev_cur == GPIO.LOW:
-        on_off_status = 'ON'  # The LEDs were OFF but got turned on
-        if transition == 0:
-            transition = 1
-            time_device_active[0] = get_current_time()
-            print('Cycle started...')
-        else:
-            # Something weird happened, reset.
-            transition = 0
-    else:
-        on_off_status = 'OFF' # The LEDs were ON but got turned OFF
-        if transition == 1:
-            transition = 0
-            time_device_active[1] = get_current_time()
-            cycle_complete = True
-        else:
-            # Something weird happened, reset.
-            transition = 0 
-
-    #print(f"UV LEDs {on_off_status}: ", get_current_time())
-    if cycle_complete:
+def exit_state(old_state,new_state):
+    if old_state == DISINFECTING:
+        time_device_active[1] = get_current_time()
+        #time_uv_leds[1] = time_device_active[1]
         new_report = create_report(badge_details, time_uv_leds,time_green_led, time_red_led)
         print(new_report)
         clear_report_details()
+    
+
+
+def enter_state(new_state,old_state):
+    if new_state == IDLE:
+        clear_report_details()
+        print('Idling')
+    elif new_state == DISINFECTING:
+        time_device_active[0] = get_current_time()
+        print('Disinfecting')
+
+
+def get_transition():
+    global state
+    global device_active
+    
+    # Figure out what to do next based on state variables
+    if state == IDLE:
+        if device_active == True:
+            return DISINFECTING
+    elif state == DISINFECTING:
+        if device_active == False:
+            return IDLE
+    
+    return None
+
+
+def state_logic():
+    global state
+    
+    _check_device_status()
+    if state == IDLE:
+        _idle()
+    elif state == DISINFECTING:
+        _check_door_leds()
+        _check_uv_leds()
+        _disinfecting()
+
+
+def set_state(new_state):
+    global state, previous_state
+    previous_state = state
+    state = new_state
+    if previous_state != None:
+        exit_state(previous_state, new_state)
+    if new_state != None:
+        enter_state(new_state, previous_state)
+
+
+def _idle():
+    global card_reader
+    
+    # Scan for tags forever
+    tag = card_reader.scan_for_tags()
+    
+    # If we got a tag, print it out
+    if tag is not None:
+        print('Tag data: %s' % pcprox._format_hex(tag[0]))
+        print('Bit length: %d' % tag[1])
+    #time.sleep(0.4)
+
+
+def _disinfecting():
+    #time.sleep(0.4) # Must delay a little bit
+    pass
+
+
+def _check_device_status():
+    global device_active
+    if GPIO.input(PIN_STATUS_DEVICE) == GPIO.LOW:
+        device_active = True
+    else:
+        device_active = False
+
+
+def _check_door_leds():
+    global door_red_led_need_transition
+    global door_green_led_need_transition
+    global time_red_led, time_green_led
+    
+    
+    
+    if door_red_led_need_transition:
+        status_red_led = GPIO.input(PIN_STATUS_DOOR_RED)
+        if status_red_led == GPIO.LOW:
+            time_red_led[0] = get_current_time()
+        else:
+            time_red_led[1] = get_current_time()
+        door_red_led_need_transition = False
+    
+    if door_green_led_need_transition:
+        status_green_led = GPIO.input(PIN_STATUS_DOOR_GREEN)
+        if status_green_led == GPIO.LOW:
+            time_green_led[0] = get_current_time()
+        else:
+            time_green_led[1] = get_current_time()
+        door_green_led_need_transition = False
+            
+
+def _check_uv_leds():
+    global status_uv_leds, status_uv_leds_prev
+    
+    status_uv_leds = GPIO.input(PIN_STATUS_UV)
+    need_transition = (status_uv_leds != status_uv_leds_prev)
+    if need_transition:
+        status_uv_leds_prev = status_uv_leds
+        if status_uv_leds == GPIO.LOW:
+            time_uv_leds[0] = get_current_time()
+            print("UV LEDs ON")
+        else:
+            print("UV LEDs OFF")
+            time_uv_leds[1] = get_current_time()
+            
+            # Maybe don't need to worry about the OFF time because they
+            #  automatically turn off when the device itself turns off.
+            pass
+
 
 
 def int_led_uv(channel):
-    state_led_uv = GPIO.input(PIN_STATUS_UV)
-    if state_led_uv == GPIO.LOW:
-        time_uv_leds[0] = get_current_time()
-    else:
-        time_uv_leds[1] = get_current_time()
+    global uv_led_need_transition
+    uv_led_need_transition = True
     
 
 def int_door_led_green(channel):
-    state_led = GPIO.input(PIN_STATUS_DOOR_GREEN)
-    if state_led == GPIO.LOW:
-        time_green_led[0] = get_current_time()
-    else:
-        time_green_led[1] = get_current_time()
+    global door_red_led_need_transition
+    global door_green_led_need_transition
+    door_green_led_need_transition = True
 
 
 def int_door_led_red(channel):
-    state_led = GPIO.input(PIN_STATUS_DOOR_RED)
-    if state_led == GPIO.LOW:
-        time_red_led[0] = get_current_time()
-    else:
-        time_red_led[1] = get_current_time()
+    global door_red_led_need_transition
+    global door_green_led_need_transition
+    door_red_led_need_transition = True
 
 
 # Set up an interrupt for rising OR falling edge
-GPIO.add_event_detect(PIN_STATUS_DEVICE, GPIO.BOTH, callback=int_device_active, bouncetime=300)
-GPIO.add_event_detect(PIN_STATUS_UV, GPIO.BOTH, callback=int_led_uv, bouncetime=300)
-GPIO.add_event_detect(PIN_STATUS_DOOR_GREEN, GPIO.BOTH, callback=int_door_led_green, bouncetime=300)
-GPIO.add_event_detect(PIN_STATUS_DOOR_RED, GPIO.BOTH, callback=int_door_led_red, bouncetime=300)
+GPIO.add_event_detect(PIN_STATUS_UV, GPIO.BOTH, callback=int_led_uv, bouncetime=250)
+GPIO.add_event_detect(PIN_STATUS_DOOR_GREEN, GPIO.BOTH, callback=int_door_led_green, bouncetime=250)
+GPIO.add_event_detect(PIN_STATUS_DOOR_RED, GPIO.BOTH, callback=int_door_led_red, bouncetime=250)
 
 
 """
@@ -229,8 +257,8 @@ def create_report(badge_details,time_uv_leds, time_green_led, time_red_led):
     report += f"Badge ID Number: {badge_details[1]}\n"
     report += f"Name: {badge_details[2]}\n"
     report += '************************************************\n'
-    report += f"Upper LEDs ON: {time_uv_leds[0]}\n"
-    report += f"Upper LEDs OFF: {time_uv_leds[1]}\n"
+    report += f"UV LEDs ON: {time_uv_leds[0]}\n"
+    report += f"UV LEDs OFF: {time_uv_leds[1]}\n"
     report += f"Door Green LED ON: {time_green_led[0]}\n"
     report += f"Door Green LED OFF: {time_green_led[1]}\n"
     report += f"Door Red LED ON: {time_red_led[0]}\n"
@@ -256,6 +284,7 @@ def main(debug=False):
     set_state(IDLE)
     try:
         while True:
+            time.sleep(0.1) # Must delay a little bit
             if state != None:
                 state_logic()
                 trans = get_transition()
