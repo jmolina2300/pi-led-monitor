@@ -12,6 +12,87 @@ PIN_STATUS_DOOR_GREEN = 40
 
 transition = 0
 
+# Define states for the FSM
+IDLE = 0
+DISINFECTING = 1
+
+state = None
+previous_state = None
+device_active = False
+
+# Card Reader to be used
+card_reader = None
+
+
+def exit_state(old_state,new_state):
+    pass
+
+
+def enter_state(new_state,old_state):
+    if new_state == IDLE:
+        print('Idling')
+    elif new_state == DISINFECTING:
+        print('Disinfecting')
+
+
+def get_transition():
+    global state
+    global device_active
+    # Figure out what to do next based on state variables
+    if state == IDLE:
+        if device_active == True:
+            return DISINFECTING
+    elif state == DISINFECTING:
+        if device_active == False:
+            return IDLE
+    
+    return None
+
+
+def state_logic():
+    global state
+    
+    _check_device_status()
+    if state == IDLE:
+        _idle()
+    elif state == DISINFECTING:
+        _disinfecting()
+
+
+def set_state(new_state):
+    global state
+    previous_state = state
+    state = new_state
+    if previous_state != None:
+        exit_state(previous_state, new_state)
+    if new_state != None:
+        enter_state(new_state, previous_state)
+
+
+def _idle():
+    global card_reader
+    
+    # Scan for tags forever
+    tag = card_reader.scan_for_tags()
+    
+    # If we got a tag, print it out
+    if tag is not None:
+        print('Tag data: %s' % pcprox._format_hex(tag[0]))
+        print('Bit length: %d' % tag[1])
+    time.sleep(0.5)
+
+def _disinfecting():
+    pass
+
+def _check_device_status():
+    global device_active
+    if GPIO.input(PIN_STATUS_DEVICE) == GPIO.LOW:
+        device_active = True
+    else:
+        device_active = False
+        
+
+
 
 # Report details
 badge_details = [True, 12345, 'JOHN DOE']
@@ -162,7 +243,7 @@ def create_report(badge_details,time_uv_leds, time_green_led, time_red_led):
 
 
 def main(debug=False):
-    
+    global card_reader
     current_time = get_current_time()
     print('Script started at ',current_time)
     
@@ -171,16 +252,15 @@ def main(debug=False):
     card_reader = CardReader(debug=False)
     
     print('Waiting for a card...')
+    
+    set_state(IDLE)
     try:
         while True:
-            # Scan for tags forever
-            tag = card_reader.scan_for_tags()
-            
-            # If we got a tag, print it out
-            if tag is not None:
-                print('Tag data: %s' % pcprox._format_hex(tag[0]))
-                print('Bit length: %d' % tag[1])
-            time.sleep(0.5)
+            if state != None:
+                state_logic()
+                trans = get_transition()
+                if trans != None:
+                    set_state(trans)
     except KeyboardInterrupt:
         pass
     finally:
