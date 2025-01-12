@@ -10,7 +10,8 @@ PIN_STATUS_UV = 36
 PIN_STATUS_DOOR_RED = 38
 PIN_STATUS_DOOR_GREEN = 40
 
-transition = 0
+
+CYCLE_TIME_EXPECTED = 26
 
 # Define states for the FSM
 IDLE = 0
@@ -40,7 +41,7 @@ card_reader = None
 
 
 # Report details
-badge_details = [True, 12345, 'JOHN DOE']
+badge_details = [False, 0, ' ']
 time_device_active = [None,None]
 time_uv_leds = [None, None]
 time_green_led = [None, None]
@@ -62,7 +63,7 @@ GPIO.setup(PIN_STATUS_DOOR_GREEN, GPIO.IN, pull_up_down=GPIO.PUD_UP)
 def exit_state(old_state,new_state):
     if old_state == DISINFECTING:
         time_device_active[1] = get_current_time()
-        #time_uv_leds[1] = time_device_active[1]
+        fix_uv_led_time()
         new_report = create_report(badge_details, time_uv_leds,time_green_led, time_red_led)
         print(new_report)
         clear_report_details()
@@ -183,7 +184,36 @@ def _check_uv_leds():
             #  automatically turn off when the device itself turns off.
             pass
 
+"""
+fix_uv_led_time
 
+Fixs the UV LED time. If the LEDs are working properly, they turn OFF
+at the same time as the device itself, which makes logging their own 
+OFF time very tricky.
+
+This function compares the OFF time to the ON time, and makes sure it
+sits somewhere in the middle, OR, if everything worked fine, at the 
+very end. 
+
+"""
+def fix_uv_led_time():
+    global time_uv_leds
+    
+    uv_malfunction = (time_uv_leds[0] == None or time_uv_leds[1] == None)
+    if uv_malfunction:
+        return
+    
+    impossibly_early = (time_uv_leds[1] < time_uv_leds[0])
+    impossibly_exact = (time_uv_leds[1] == time_uv_leds[0]) 
+    impossible_time = impossibly_exact or impossibly_early
+    leds_turned_on = time_uv_leds[0] != None
+    
+    if leds_turned_on:
+        if impossible_time:
+            # The LEDs must have shut off at the same time as the device.
+            time_uv_leds[1] = get_current_time()
+        
+    
 
 def int_led_uv(channel):
     global uv_led_need_transition
@@ -212,7 +242,12 @@ GPIO.add_event_detect(PIN_STATUS_DOOR_RED, GPIO.BOTH, callback=int_door_led_red,
 clear_report_details
 """
 def clear_report_details():
-    badge_details = [True, 12345, 'JOHN DOE']
+    global badge_details
+    global time_device_active
+    global time_uv_leds
+    global time_green_led
+    global time_red_led
+    badge_details = [False, 0, ' ']
     time_device_active = [None, None]
     time_uv_leds = [None, None]
     time_green_led = [None, None]
@@ -250,6 +285,7 @@ Parameter format:
 def create_report(badge_details,time_uv_leds, time_green_led, time_red_led):
     current_time = get_current_time()
     cycle_time = (time_device_active[1] - time_device_active[0]).total_seconds()
+    uv_time = (time_uv_leds[1] - time_uv_leds[0]).total_seconds()
     complete_cycle = is_complete_cycle(cycle_time)
     report = '************************************************\n'
     report += f"Date: {current_time}\n"
@@ -265,10 +301,62 @@ def create_report(badge_details,time_uv_leds, time_green_led, time_red_led):
     report += f"Door Red LED OFF: {time_red_led[1]}\n"
     report += '************************************************\n'
     report += f"Cycle complete: {complete_cycle}\n"
-    report += f"Cycle time: {cycle_time}\n\n"
-    return report
+    report += f"Cycle time: {cycle_time}\n"
+    report += '************************************************\n'
     
+    uv_led_status = get_diagnostic_uv_leds(time_uv_leds,cycle_time)
+    door_green_led_status = get_diagnostic_door_leds(time_green_led,cycle_time)
+    door_red_led_status = get_diagnostic_door_leds(time_red_led,cycle_time)
 
+    report += f"HARDWARE SELF-CHECK                            \n"
+    report += f"UV LED status: {uv_led_status}                 \n"
+    report += f"Door Green LED status: {door_green_led_status} \n"
+    report += f"Door Red LED status: {door_green_led_status} \n\n"
+    
+    
+    return report
+
+
+def get_diagnostic_uv_leds(time_on_off,cycle_time):
+    uv_leds_dead = (time_on_off[1] == None and time_on_off[0] == None)
+    if uv_leds_dead:
+        return 'CRITICAL. LEDs NOT DETECTED. REPLACE LEDs OR SENSOR.'
+    
+    uv_led_status = ''
+    invalid_time = (time_on_off[1] == None or time_on_off[0] == None)
+    uv_duration = (time_on_off[1] - time_on_off[0]).total_seconds()
+    short_cycle = (uv_duration < CYCLE_TIME_EXPECTED) and (uv_duration < cycle_time - 1.5)
+    
+    if invalid_time:
+        uv_led_status = 'WARNING. INVALID TIME. CHECK LEDs OR SENSOR.'
+    elif short_cycle:
+        uv_led_status = 'WARNING. LEDs TURNED OFF PREMATURELY.'
+    else:
+        uv_led_status = 'OK.'
+    
+    return uv_led_status
+
+
+def get_diagnostic_door_leds(time_on_off,cycle_time):
+    leds_dead = (time_on_off[1] == None and time_on_off[0] == None)
+    if leds_dead:
+        return 'CRITICAL. LEDs NOT DETECTED. REPLACE LEDs OR SENSOR.'
+    
+    led_status = ''
+    invalid_time = (time_on_off[1] == None or time_on_off[0] == None)
+    duration = abs((time_on_off[1] - time_on_off[0]).total_seconds())
+    short_cycle = (duration < CYCLE_TIME_EXPECTED) and (duration < cycle_time)
+    
+    if invalid_time:
+        led_status = 'WARNING. INVALID TIME. CHECK LEDs OR SENSOR.'
+    elif short_cycle:
+        led_status = 'WARNING. LEDs TURNED OFF PREMATURELY.'
+        print(duration)
+    else:
+        led_status = 'OK.'
+    
+    return led_status
+    
 
 def main(debug=False):
     global card_reader
@@ -296,9 +384,6 @@ def main(debug=False):
         GPIO.cleanup()  # Clean up GPIO pins
 
 
-
-def get_state(pin):
-    return GPIO.input(pin)
 
 
 def get_current_time_iso():
