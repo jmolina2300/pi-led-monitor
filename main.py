@@ -31,9 +31,15 @@ door_green_led_need_transition = False
 door_red_led_need_transition = False
 uv_led_need_transition = False
 
-
+# LED states
 status_uv_leds = None
 status_uv_leds_prev = None
+
+status_red_led = None
+status_red_led_prev = None
+
+status_green_led = None
+status_green_led_prev = None
 
 
 # Card Reader to be used
@@ -143,27 +149,25 @@ def _check_device_status():
 
 
 def _check_door_leds():
-    global door_red_led_need_transition
-    global door_green_led_need_transition
-    global time_red_led, time_green_led
+    global status_green_led, status_green_led_prev
+    global status_red_led, status_red_led_prev
     
-    
-    
-    if door_red_led_need_transition:
-        status_red_led = GPIO.input(PIN_STATUS_DOOR_RED)
+    status_red_led_prev = status_red_led
+    status_red_led = GPIO.input(PIN_STATUS_DOOR_RED)
+    need_transition_red = (status_red_led != status_red_led_prev)
+    if need_transition_red:
         if status_red_led == GPIO.LOW:
             time_red_led[0] = get_current_time()
         else:
             time_red_led[1] = get_current_time()
-        door_red_led_need_transition = False
-    
-    if door_green_led_need_transition:
-        status_green_led = GPIO.input(PIN_STATUS_DOOR_GREEN)
+        
+    status_green_led_prev = status_green_led
+    status_green_led = GPIO.input(PIN_STATUS_DOOR_GREEN)
+    if need_transition_red:
         if status_green_led == GPIO.LOW:
             time_green_led[0] = get_current_time()
         else:
             time_green_led[1] = get_current_time()
-        door_green_led_need_transition = False
             
 
 def _check_uv_leds():
@@ -233,9 +237,9 @@ def int_door_led_red(channel):
 
 
 # Set up an interrupt for rising OR falling edge
-GPIO.add_event_detect(PIN_STATUS_UV, GPIO.BOTH, callback=int_led_uv, bouncetime=250)
-GPIO.add_event_detect(PIN_STATUS_DOOR_GREEN, GPIO.BOTH, callback=int_door_led_green, bouncetime=250)
-GPIO.add_event_detect(PIN_STATUS_DOOR_RED, GPIO.BOTH, callback=int_door_led_red, bouncetime=250)
+#GPIO.add_event_detect(PIN_STATUS_UV, GPIO.BOTH, callback=int_led_uv, bouncetime=250)
+#GPIO.add_event_detect(PIN_STATUS_DOOR_GREEN, GPIO.BOTH, callback=int_door_led_green, bouncetime=250)
+#GPIO.add_event_detect(PIN_STATUS_DOOR_RED, GPIO.BOTH, callback=int_door_led_red, bouncetime=250)
 
 
 """
