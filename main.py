@@ -132,11 +132,9 @@ def _idle():
     if tag is not None:
         print('Tag data: %s' % pcprox._format_hex(tag[0]))
         print('Bit length: %d' % tag[1])
-    #time.sleep(0.4)
 
 
 def _disinfecting():
-    #time.sleep(0.4) # Must delay a little bit
     pass
 
 
@@ -180,14 +178,11 @@ def _check_uv_leds():
         status_uv_leds_prev = status_uv_leds
         if status_uv_leds == GPIO.LOW:
             time_uv_leds[0] = get_current_time()
-            print("UV LEDs ON")
+            #print("UV LEDs ON")
         else:
-            print("UV LEDs OFF")
             time_uv_leds[1] = get_current_time()
-            
-            # Maybe don't need to worry about the OFF time because they
-            #  automatically turn off when the device itself turns off.
-            pass
+            #print("UV LEDs OFF")
+
 
 """
 fix_uv_led_time
@@ -205,7 +200,8 @@ def fix_uv_led_time():
     global time_uv_leds
     
     leds_turned_on = (time_uv_leds[0] != None)
-    if leds_turned_on:
+    leds_turned_off = (time_uv_leds[1] != None) 
+    if leds_turned_on and leds_turned_off:
         impossibly_early = (time_uv_leds[1] < time_uv_leds[0])
         impossibly_exact = (time_uv_leds[1] == time_uv_leds[0]) 
         impossible_time = impossibly_exact or impossibly_early
@@ -216,28 +212,6 @@ def fix_uv_led_time():
         time_uv_leds[1] = None
         
     
-
-def int_led_uv(channel):
-    global uv_led_need_transition
-    uv_led_need_transition = True
-    
-
-def int_door_led_green(channel):
-    global door_red_led_need_transition
-    global door_green_led_need_transition
-    door_green_led_need_transition = True
-
-
-def int_door_led_red(channel):
-    global door_red_led_need_transition
-    global door_green_led_need_transition
-    door_red_led_need_transition = True
-
-
-# Set up an interrupt for rising OR falling edge
-#GPIO.add_event_detect(PIN_STATUS_UV, GPIO.BOTH, callback=int_led_uv, bouncetime=250)
-#GPIO.add_event_detect(PIN_STATUS_DOOR_GREEN, GPIO.BOTH, callback=int_door_led_green, bouncetime=250)
-#GPIO.add_event_detect(PIN_STATUS_DOOR_RED, GPIO.BOTH, callback=int_door_led_red, bouncetime=250)
 
 
 """
@@ -264,7 +238,7 @@ Placeholder.
 
 """
 def is_complete_cycle(duration):
-    if duration >= 25:
+    if duration >= CYCLE_TIME_EXPECTED:
         return True
     else:
         return False
@@ -287,41 +261,44 @@ Parameter format:
 def create_report(badge_details,time_uv_leds, time_green_led, time_red_led, time_device_active):
     report_date = time_device_active[0]
     
-    # Get the cycle duration
-    cycle_time = 0
+    # Get the cycle duration (duration of timer relay ON to timer relay OFF)
+    cycle_duration = 0
+    if not (None in time_device_active):
+        cycle_duration = (time_device_active[1] - time_device_active[0]).total_seconds()
+    complete_cycle = is_complete_cycle(cycle_duration)
+    
+    # Get the UV duration
+    uv_duration = 0
     if not (None in time_uv_leds):
-        cycle_time = (time_device_active[1] - time_device_active[0]).total_seconds()
-    complete_cycle = is_complete_cycle(cycle_time)
+        uv_duration = (time_uv_leds[1] - time_uv_leds[0]).total_seconds()
+    
         
-    # Get the UV light duration
-    uv_time = 0
-    if not (None in time_uv_leds):
-        uv_time = (time_uv_leds[1] - time_uv_leds[0]).total_seconds()
-    
     report = '************************************************\n'
-    report += f"Date: {report_date}\n"
-    report += f"Badge ID Read: {badge_details[0]}\n"
-    report += f"Badge ID Number: {badge_details[1]}\n"
-    report += f"Name: {badge_details[2]}\n"
-    report += '************************************************\n'
-    report += f"UV LEDs ON: {time_uv_leds[0]}\n"
-    report += f"UV LEDs OFF: {time_uv_leds[1]}\n"
-    report += f"Door Green LED ON: {time_green_led[0]}\n"
-    report += f"Door Green LED OFF: {time_green_led[1]}\n"
-    report += f"Door Red LED ON: {time_red_led[0]}\n"
-    report += f"Door Red LED OFF: {time_red_led[1]}\n"
-    report += '************************************************\n'
-    report += f"Cycle complete: {complete_cycle}\n"
-    report += f"Cycle time: {cycle_time}\n"
+    report += f"REPORT\n"
+    report += f"  Date: {report_date}\n"
+    report += f"  Badge ID Read: {badge_details[0]}\n"
+    report += f"  Badge ID Number: {badge_details[1]}\n"
+    report += f"  Name: {badge_details[2]}\n"
+    #report += '************************************************\n'
+    report += f"  UV LEDs ON: {time_uv_leds[0]}\n"
+    report += f"  UV LEDs OFF: {time_uv_leds[1]}\n"
+    report += f"  Door Green LED ON: {time_green_led[0]}\n"
+    report += f"  Door Green LED OFF: {time_green_led[1]}\n"
+    report += f"  Door Red LED ON: {time_red_led[0]}\n"
+    report += f"  Door Red LED OFF: {time_red_led[1]}\n"
+    #report += '************************************************\n'
+    report += f"  UV duration: {uv_duration}\n"
+    report += f"  Cycle duration: {cycle_duration}\n"
+    report += f"  Cycle complete: {complete_cycle}\n"
     report += '************************************************\n'
     
-    uv_led_status = get_diagnostic_uv_leds(time_uv_leds,cycle_time)
-    door_green_led_status = get_diagnostic_door_leds(time_green_led,cycle_time)
-    door_red_led_status = get_diagnostic_door_leds(time_red_led,cycle_time)
-    report += f"HARDWARE SELF-CHECK                            \n"
-    report += f"UV LED status: {uv_led_status}                 \n"
-    report += f"Door Green LED status: {door_green_led_status} \n"
-    report += f"Door Red LED status: {door_red_led_status} \n\n"
+    uv_led_status = get_diagnostic_uv_leds(time_uv_leds,cycle_duration)
+    door_green_led_status = get_diagnostic_door_leds(time_green_led,cycle_duration)
+    door_red_led_status = get_diagnostic_door_leds(time_red_led,cycle_duration)
+    report += f"HARDWARE ASSESSMENT                            \n"
+    report += f"  UV LED: {uv_led_status}                 \n"
+    report += f"  Door Green LED: {door_green_led_status} \n"
+    report += f"  Door Red LED: {door_red_led_status} \n\n"
     return report
 
 
