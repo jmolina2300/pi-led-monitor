@@ -3,8 +3,20 @@ File:
 
     cardreader.py
 
-Description:
+WARNING:
 
+    This code is not ready for production. It is a very simple wrapper that
+    was created to simplify the code in main.py. More work will need to be 
+    done on the pcprox module directly to avoid fatal crashes.
+    
+    For example, if the card reader is unplugged when this module is used, 
+    the script will throw an error and stop.
+    
+    Look at the 'test_pcprox_read.py' example code and the 'pcprox.py' module
+    to see how everything works at the lowest level.
+
+Description:
+    
     This file contains a CardReader class that encapsulates the 
     implementation-specific details for a card reading device. In this 
     case, it is a PC Prox RDR-6082AKU card reader connected via USB. 
