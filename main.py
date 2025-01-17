@@ -64,7 +64,12 @@ GPIO.setup(PIN_DOOR_RED_LED, GPIO.IN, pull_up_down=GPIO.PUD_UP)
 GPIO.setup(PIN_DOOR_GREEN_LED, GPIO.IN, pull_up_down=GPIO.PUD_UP)
 
 
+"""
+exit_state
 
+Called ONCE when exiting a state.
+
+"""
 def exit_state(old_state,new_state):
     if old_state == DISINFECTING:
         time_device_active[1] = get_current_time()
@@ -74,7 +79,12 @@ def exit_state(old_state,new_state):
         clear_report_details()
     
 
+"""
+exit_state
 
+Called ONCE when entering a new state.
+
+"""
 def enter_state(new_state,old_state):
     if new_state == IDLE:
         clear_report_details()
@@ -84,6 +94,22 @@ def enter_state(new_state,old_state):
         print('Disinfecting')
 
 
+"""
+get_transition
+
+Called always.
+
+This function determines what state to transition into based on the value of
+some flag variables. In our simple case, there is only 1 variable:
+
+    device_active
+
+Return value is a state to transition into. Sometimes, there won't be a
+transition. In that case, the 'if-else' block will be avoided and the function
+will return None.
+
+
+"""
 def get_transition():
     global state
     global device_active
@@ -99,6 +125,14 @@ def get_transition():
     return None
 
 
+"""
+state_logic
+
+Called always.
+
+This function performs the actions associated with each state.
+
+"""
 def state_logic():
     global state
     
@@ -111,6 +145,12 @@ def state_logic():
         _disinfecting()
 
 
+"""
+set_state
+
+Called at startup (manually) and called each time a transition is needed.
+
+"""
 def set_state(new_state):
     global state, previous_state
     previous_state = state
@@ -119,7 +159,16 @@ def set_state(new_state):
         exit_state(previous_state, new_state)
     if new_state != None:
         enter_state(new_state, previous_state)
+ 
 
+"""
+_handle_tag_read
+
+Called when a tag is read.
+This is a placeholder function. The point is that something always needs to
+happen when a tag is scanned.
+
+"""
 def _handle_tag_read():
     ##
     # Do whatever we need to do when reading a tag
@@ -127,6 +176,12 @@ def _handle_tag_read():
     pass
 
 
+"""
+_idle
+
+Called when in the IDLE state.
+
+"""
 def _idle():
     global card_reader
     
@@ -140,10 +195,25 @@ def _idle():
         _handle_tag_read()
 
 
+"""
+_disinfecting
+
+Called when in the DISINFECTING state.
+
+"""
 def _disinfecting():
     pass
 
 
+"""
+_check_door_leds
+
+Called ALWAYS.
+
+This function checks the state of the device using the corresponding GPIO pin
+and sets the "device active" variable based on the HIGH or LOW state.
+
+"""
 def _check_device_status():
     global device_active
     if GPIO.input(PIN_DEVICE) == GPIO.LOW:
@@ -152,7 +222,19 @@ def _check_device_status():
         device_active = False
 
 
+"""
+_check_door_leds
+
+Called while in the DISINFECTING state.
+
+This function reads the states of the GPIO pins associated with the DOOR LEDs 
+and compares them to the previous states. If there is a change in state, the
+time of START or END is set using the get_current_time() function.
+
+
+"""
 def _check_door_leds():
+    global time_red_led, time_green_led
     global state_door_green_led, state_door_green_led_prev
     global state_door_red_led, state_door_red_led_prev
     
@@ -175,7 +257,19 @@ def _check_door_leds():
             time_green_led[1] = get_current_time()
             
 
+"""
+_check_uv_leds
+
+Called while in the DISINFECTING state.
+
+This function reads the state of the GPIO pin associated with the UV LEDs 
+and compares it to the previous state. If there is a change in state, the
+time of START or END is set using the get_current_time() function.
+
+
+"""
 def _check_uv_leds():
+    global time_uv_leds
     global state_uv_leds, state_uv_leds_prev
     
     state_uv_leds = GPIO.input(PIN_UV_LED)
@@ -222,6 +316,8 @@ def fix_uv_led_time():
 
 """
 clear_report_details
+
+Clears the details of the report for the next cycle.
 """
 def clear_report_details():
     global badge_details
@@ -239,8 +335,8 @@ def clear_report_details():
 """
 is_cycle_complete
 
-Tells if a cycle was complete based on the duration (~35 seconds).
-Placeholder.
+Tells if a cycle was complete based on the duration (~26 seconds).
+Placeholder. 
 
 """
 def is_complete_cycle(duration):
@@ -368,6 +464,26 @@ def get_diagnostic_door_leds(time_on_off,cycle_time):
     return led_status
     
 
+"""
+get_current_time_iso
+
+Returns the current time in the ISO-8601 format.
+
+"""
+def get_current_time_iso():
+    return datetime.now().replace(microsecond=0).isoformat()
+
+
+"""
+get_current_time
+
+Returns the current time in the default format.
+
+"""
+def get_current_time():
+    return datetime.now().replace(microsecond=0)
+
+
 def main(debug=False):
     global card_reader
     current_time = get_current_time()
@@ -392,27 +508,6 @@ def main(debug=False):
         pass
     finally:
         GPIO.cleanup()  # Clean up GPIO pins
-
-
-"""
-get_current_time_iso
-
-Returns the current time in the ISO-8601 format.
-
-"""
-def get_current_time_iso():
-    return datetime.now().replace(microsecond=0).isoformat()
-
-
-"""
-get_current_time
-
-Returns the current time in the default format.
-
-"""
-def get_current_time():
-    return datetime.now().replace(microsecond=0)
-
 
 
 if __name__ == '__main__':
