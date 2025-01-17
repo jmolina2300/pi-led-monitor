@@ -10,8 +10,8 @@ from cardreader import CardReader
 # Define pin names
 PIN_DEVICE = 32
 PIN_UV_LED = 36
-PIN_DOOR_RED_LED = 38
-PIN_DOOR_GREEN_LED = 40
+PIN_DOOR_GREEN_LED = 38
+PIN_DOOR_RED_LED = 40
 
 # Define an 'expected' cycle time to determine if the cycle was compliant
 CYCLE_TIME_EXPECTED = 26
