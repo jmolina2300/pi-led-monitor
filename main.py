@@ -23,9 +23,6 @@ previous_state = None
 device_active = False
 
 
-state_door_red_led = 0
-state_door_red_led_prev = 0
-
 door_green_led_need_transition = False
 door_red_led_need_transition = False
 uv_led_need_transition = False
@@ -313,7 +310,19 @@ def create_report(badge_details,time_uv_leds, time_green_led, time_red_led, time
 
 
 
+"""
+get_diagnostic_uv_leds
 
+<<NOT READY FOR PRODUCTION>>
+
+An EXAMPLE function to demonstrate an onboard diagnostic based on LED times.
+Returns a string with an appropriate error message.
+
+Note, this function is VERY similar to 'get_diagnostic_door_leds' but it 
+differs in the time it checks because the UV LEDs have a delay with respect
+to the device.
+
+"""
 def get_diagnostic_uv_leds(time_on_off,cycle_time):
     uv_leds_dead = (time_on_off[1] == None and time_on_off[0] == None)
     if uv_leds_dead:
@@ -331,7 +340,15 @@ def get_diagnostic_uv_leds(time_on_off,cycle_time):
         return 'OK.'
 
 
+"""
+get_diagnostic_door_leds
 
+<<NOT READY FOR PRODUCTION>>
+
+An EXAMPLE function to demonstrate an onboard diagnostic based on LED times.
+Returns a string with an appropriate error message.
+
+"""
 def get_diagnostic_door_leds(time_on_off,cycle_time):
     leds_dead = (time_on_off[1] == None and time_on_off[0] == None)
     if leds_dead:
@@ -377,27 +394,25 @@ def main(debug=False):
         GPIO.cleanup()  # Clean up GPIO pins
 
 
+"""
+get_current_time_iso
 
+Returns the current time in the ISO-8601 format.
 
+"""
 def get_current_time_iso():
     return datetime.now().replace(microsecond=0).isoformat()
-    
+
+
+"""
+get_current_time
+
+Returns the current time in the default format.
+
+"""
 def get_current_time():
     return datetime.now().replace(microsecond=0)
 
-
-def test_LED():
-    GPIO.output(PIN_DEVICE_POWER, GPIO.LOW)
-    time.sleep(2)
-    GPIO.output(PIN_DEVICE_POWER, GPIO.HIGH)
-    time.sleep(2)
-
-
-def blink():
-    GPIO.output(PIN_DEVICE_POWER, GPIO.HIGH)   # Turn on
-    time.sleep(1)
-    GPIO.output(PIN_DEVICE_POWER, GPIO.LOW)    # Turn off
-    time.sleep(1)
 
 
 if __name__ == '__main__':
