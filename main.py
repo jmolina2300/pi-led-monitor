@@ -6,6 +6,7 @@ import time
 import pcprox
 from datetime import datetime
 from cardreader import CardReader
+from badge import Badge
 
 # Define pin names
 PIN_DEVICE = 32
@@ -52,7 +53,7 @@ card_reader = None
 
 
 # Report details -- Probably turn this into a data structure
-badge_details = [False, 0, ' ']
+badge = None
 time_device_active = [None,None]
 time_uv_leds = [None, None]
 time_door_green_led = [None, None]
@@ -184,11 +185,9 @@ the default values
 
 """
 def handle_RFID_scan():
-    global data_RFID, data_RFID_prev
-    
-    badge_details[0] = True
-    badge_details[1] = pcprox._format_hex(data_RFID[0])
-    badge_details[2] = 'John Doe'
+    global data_RFID
+    global badge
+    badge = Badge(pcprox._format_hex(data_RFID[0]), "JOHN DOE")
     
 
 
@@ -340,12 +339,12 @@ clear_report_details
 Clears the details of the report for the next cycle.
 """
 def clear_report_details():
-    global badge_details
+    global badge
     global time_device_active
     global time_uv_leds
     global time_door_green_led
     global time_door_red_led
-    badge_details = [False, 0, ' ']
+    badge = Badge()
     time_device_active = [None, None]
     time_uv_leds = [None, None]
     time_door_green_led = [None, None]
@@ -374,7 +373,7 @@ any other information required.
 
 
 Report fields (Rev. Jan 16, 2025):
-    badge_details
+    badge
     time_device_active
     time_uv_leds
     time_door_green_led
@@ -382,7 +381,7 @@ Report fields (Rev. Jan 16, 2025):
 
 """
 def create_report():
-    global badge_details
+    global badge
     global time_device_active
     global time_uv_leds
     global time_door_green_led
@@ -406,9 +405,9 @@ def create_report():
     report = '************************************************\n'
     report += f"REPORT\n"
     report += f"  Date: {report_date}\n"
-    report += f"  Badge ID Read: {badge_details[0]}\n"
-    report += f"  Badge ID Number: {badge_details[1]}\n"
-    report += f"  Name: {badge_details[2]}\n"
+    report += f"  Badge ID Read: {badge.scanned}\n"
+    report += f"  Badge ID Number: {badge.number}\n"
+    report += f"  Name: {badge.name}\n"
     #report += '************************************************\n'
     report += f"  UV LEDs ON: {time_uv_leds[0]}\n"
     report += f"  UV LEDs OFF: {time_uv_leds[1]}\n"
