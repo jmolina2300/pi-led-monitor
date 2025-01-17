@@ -27,9 +27,6 @@ previous_state = None
 device_active = False
 
 
-door_green_led_need_transition = False
-door_red_led_need_transition = False
-uv_led_need_transition = False
 
 # STATE: UV LEDs
 state_uv_leds = None
