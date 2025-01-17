@@ -139,7 +139,7 @@ _format_hex
 Used to convert raw bytes into a string of hex bytes.
 """
 def _format_hex(i: bytes) -> Text:
-    return ' '.join(['%02x' % c for c in i])
+    return ''.join(['%02x' % c for c in i])
 
 
 def _int_field(page: int,

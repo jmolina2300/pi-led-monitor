@@ -42,6 +42,10 @@ state_door_red_led_prev = None
 state_door_green_led = None
 state_door_green_led_prev = None
 
+# DATA: Card Reader
+data_RFID = None
+data_RFID_prev = None
+
 
 # Card Reader object to be used
 card_reader = None
@@ -169,18 +173,23 @@ def set_state(new_state):
  
 
 """
-_handle_tag_read
+handle_tag_read
 
-Called when a tag is read.
-This is a placeholder function. The point is that something always needs to
-happen when a tag is scanned.
+Called ONCE when an RFID card is read.
+
+The RFID information is saved in the badge data structure until the device
+completes a cycle. After a cycle is complete, the badge details are reset to
+the default values
+
 
 """
-def _handle_tag_read():
-    ##
-    # Do whatever we need to do when reading a tag
-    ##
-    pass
+def handle_RFID_scan():
+    global data_RFID, data_RFID_prev
+    
+    badge_details[0] = True
+    badge_details[1] = pcprox._format_hex(data_RFID[0])
+    badge_details[2] = 'John Doe'
+    
 
 
 """
@@ -191,15 +200,19 @@ Called when in the IDLE state.
 """
 def _idle():
     global card_reader
+    global data_RFID, data_RFID_prev
+
+    # Scan for RFIDs forever
+    data_RFID_prev = data_RFID
+    data_RFID = card_reader.scan()
     
-    # Scan for tags forever
-    tag = card_reader.scan_for_tags()
-    
-    # If we got a tag, print it out
-    if tag is not None:
-        print('Tag data: %s' % pcprox._format_hex(tag[0]))
-        print('Bit length: %d' % tag[1])
-        _handle_tag_read()
+    # See if we actually read a new RFID
+    new_tag_read = (data_RFID_prev != data_RFID)
+    if new_tag_read and (data_RFID is not None):
+        print('Tag data: %s' % pcprox._format_hex(data_RFID[0]))
+        print('Bit length: %d' % data_RFID[1])
+        handle_RFID_scan()
+
 
 
 """

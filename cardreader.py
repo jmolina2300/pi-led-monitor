@@ -56,7 +56,7 @@ class CardReader:
         sleep(.5)
 
 
-    def scan_for_tags(self):
+    def scan(self):
         return self.dev.get_tag()
 
 
