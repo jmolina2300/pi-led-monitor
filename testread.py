@@ -1,4 +1,8 @@
 #!/usr/bin/env python3
+#
+# This script tests the pcprox module on its own.
+#
+#
 import pcprox
 from time import sleep
 

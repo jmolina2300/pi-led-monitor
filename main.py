@@ -48,8 +48,8 @@ card_reader = None
 badge_details = [False, 0, ' ']
 time_device_active = [None,None]
 time_uv_leds = [None, None]
-time_green_led = [None, None]
-time_red_led = [None, None]
+time_door_green_led = [None, None]
+time_door_red_led = [None, None]
 
 
 # Set up GPIO mode
@@ -71,10 +71,12 @@ Called ONCE when exiting a state.
 
 """
 def exit_state(old_state,new_state):
+    global time_device_active
+    
     if old_state == DISINFECTING:
         time_device_active[1] = get_current_time()
         fix_uv_led_time()
-        new_report = create_report(badge_details, time_uv_leds,time_green_led, time_red_led, time_device_active)
+        new_report = create_report()
         print(new_report)
         clear_report_details()
     
@@ -86,6 +88,8 @@ Called ONCE when entering a new state.
 
 """
 def enter_state(new_state,old_state):
+    global time_device_active
+    
     if new_state == IDLE:
         clear_report_details()
         print('Idling')
@@ -234,7 +238,7 @@ time of START or END is set using the get_current_time() function.
 
 """
 def _check_door_leds():
-    global time_red_led, time_green_led
+    global time_door_red_led, time_door_green_led
     global state_door_green_led, state_door_green_led_prev
     global state_door_red_led, state_door_red_led_prev
     
@@ -243,18 +247,18 @@ def _check_door_leds():
     need_transition_red = (state_door_red_led != state_door_red_led_prev)
     if need_transition_red:
         if state_door_red_led == GPIO.LOW:
-            time_red_led[0] = get_current_time()
+            time_door_red_led[0] = get_current_time()
         else:
-            time_red_led[1] = get_current_time()
+            time_door_red_led[1] = get_current_time()
         
     state_door_green_led_prev = state_door_green_led
     state_door_green_led = GPIO.input(PIN_DOOR_GREEN_LED)
     need_transition_green = (state_door_green_led != state_door_green_led_prev)
     if need_transition_green:
         if state_door_green_led == GPIO.LOW:
-            time_green_led[0] = get_current_time()
+            time_door_green_led[0] = get_current_time()
         else:
-            time_green_led[1] = get_current_time()
+            time_door_green_led[1] = get_current_time()
             
 
 """
@@ -323,13 +327,13 @@ def clear_report_details():
     global badge_details
     global time_device_active
     global time_uv_leds
-    global time_green_led
-    global time_red_led
+    global time_door_green_led
+    global time_door_red_led
     badge_details = [False, 0, ' ']
     time_device_active = [None, None]
     time_uv_leds = [None, None]
-    time_green_led = [None, None]
-    time_red_led = [None, None]
+    time_door_green_led = [None, None]
+    time_door_red_led = [None, None]
 
 
 """
@@ -353,14 +357,22 @@ Creates a report with the badge ID, the time ON/OFF for all  LEDs and
 any other information required.
 
 
-Parameter format:
-  badge_details[badge_id_read, badge_id, badge_name]
-  time_uv_leds[time_ON, time_OFF]
-  time_green_led[time_ON, time_OFF]
-  time_red_led[time_ON, time_OFF]
+Report fields (Rev. Jan 16, 2025):
+    badge_details
+    time_device_active
+    time_uv_leds
+    time_door_green_led
+    time_door_red_led
 
 """
-def create_report(badge_details,time_uv_leds, time_green_led, time_red_led, time_device_active):
+def create_report():
+    global badge_details
+    global time_device_active
+    global time_uv_leds
+    global time_door_green_led
+    global time_door_red_led
+    
+    # Get the report date (the cycle start time)
     report_date = time_device_active[0]
     
     # Get the cycle duration (duration of timer relay ON to timer relay OFF)
@@ -384,10 +396,10 @@ def create_report(badge_details,time_uv_leds, time_green_led, time_red_led, time
     #report += '************************************************\n'
     report += f"  UV LEDs ON: {time_uv_leds[0]}\n"
     report += f"  UV LEDs OFF: {time_uv_leds[1]}\n"
-    report += f"  Door Green LED ON: {time_green_led[0]}\n"
-    report += f"  Door Green LED OFF: {time_green_led[1]}\n"
-    report += f"  Door Red LED ON: {time_red_led[0]}\n"
-    report += f"  Door Red LED OFF: {time_red_led[1]}\n"
+    report += f"  Door Green LED ON: {time_door_green_led[0]}\n"
+    report += f"  Door Green LED OFF: {time_door_green_led[1]}\n"
+    report += f"  Door Red LED ON: {time_door_red_led[0]}\n"
+    report += f"  Door Red LED OFF: {time_door_red_led[1]}\n"
     #report += '************************************************\n'
     report += f"  UV duration: {uv_duration}\n"
     report += f"  Cycle duration: {cycle_duration}\n"
@@ -395,11 +407,11 @@ def create_report(badge_details,time_uv_leds, time_green_led, time_red_led, time
     report += '************************************************\n'
     
     uv_led_status = get_diagnostic_uv_leds(time_uv_leds,cycle_duration)
-    door_green_led_status = get_diagnostic_door_leds(time_green_led,cycle_duration)
-    door_red_led_status = get_diagnostic_door_leds(time_red_led,cycle_duration)
-    report += f"HARDWARE ASSESSMENT                            \n"
-    report += f"  UV LED: {uv_led_status}                 \n"
-    report += f"  Door Green LED: {door_green_led_status} \n"
+    door_green_led_status = get_diagnostic_door_leds(time_door_green_led,cycle_duration)
+    door_red_led_status = get_diagnostic_door_leds(time_door_red_led,cycle_duration)
+    report += f"HARDWARE ASSESSMENT\n"
+    report += f"  UV LED: {uv_led_status}\n"
+    report += f"  Door Green LED: {door_green_led_status}\n"
     report += f"  Door Red LED: {door_red_led_status} \n\n"
     return report
 
