@@ -5,24 +5,23 @@ from datetime import datetime
 from cardreader import CardReader
 
 # Define pin names
-PIN_STATUS_DEVICE = 32
-PIN_STATUS_UV = 36
-PIN_STATUS_DOOR_RED = 38
-PIN_STATUS_DOOR_GREEN = 40
+PIN_DEVICE = 32
+PIN_UV_LED = 36
+PIN_DOOR_RED_LED = 38
+PIN_DOOR_GREEN_LED = 40
 
-
+# Define an 'expected' cycle time to determine if the cycle was compliant
 CYCLE_TIME_EXPECTED = 26
 
 # Define states for the FSM
 IDLE = 0
 DISINFECTING = 1
 
+# STATE: DEVICE
 state = None
 previous_state = None
 device_active = False
 
-state_door_green_led = 0
-state_door_green_led_prev = 0
 
 state_door_red_led = 0
 state_door_red_led_prev = 0
@@ -31,27 +30,30 @@ door_green_led_need_transition = False
 door_red_led_need_transition = False
 uv_led_need_transition = False
 
-# LED states
-status_uv_leds = None
-status_uv_leds_prev = None
+# STATE: UV LEDs
+state_uv_leds = None
+state_uv_leds_prev = None
 
-status_red_led = None
-status_red_led_prev = None
+# STATE: DOOR RED LED
+state_door_red_led = None
+state_door_red_led_prev = None
 
-status_green_led = None
-status_green_led_prev = None
+# STATE: DOOR GREEN LED
+state_door_green_led = None
+state_door_green_led_prev = None
 
 
-# Card Reader to be used
+# Card Reader object to be used
 card_reader = None
 
 
-# Report details
+# Report details -- Probably turn this into a data structure
 badge_details = [False, 0, ' ']
 time_device_active = [None,None]
 time_uv_leds = [None, None]
 time_green_led = [None, None]
 time_red_led = [None, None]
+
 
 # Set up GPIO mode
 GPIO.setmode(GPIO.BOARD)
@@ -59,10 +61,10 @@ GPIO.setmode(GPIO.BOARD)
 
 
 # Set GPIO pin modes
-GPIO.setup(PIN_STATUS_DEVICE, GPIO.IN, pull_up_down=GPIO.PUD_UP)
-GPIO.setup(PIN_STATUS_UV, GPIO.IN, pull_up_down=GPIO.PUD_UP)
-GPIO.setup(PIN_STATUS_DOOR_RED, GPIO.IN, pull_up_down=GPIO.PUD_UP)
-GPIO.setup(PIN_STATUS_DOOR_GREEN, GPIO.IN, pull_up_down=GPIO.PUD_UP)
+GPIO.setup(PIN_DEVICE, GPIO.IN, pull_up_down=GPIO.PUD_UP)
+GPIO.setup(PIN_UV_LED, GPIO.IN, pull_up_down=GPIO.PUD_UP)
+GPIO.setup(PIN_DOOR_RED_LED, GPIO.IN, pull_up_down=GPIO.PUD_UP)
+GPIO.setup(PIN_DOOR_GREEN_LED, GPIO.IN, pull_up_down=GPIO.PUD_UP)
 
 
 
@@ -121,6 +123,12 @@ def set_state(new_state):
     if new_state != None:
         enter_state(new_state, previous_state)
 
+def _handle_tag_read():
+    ##
+    # Do whatever we need to do when reading a tag
+    ##
+    pass
+
 
 def _idle():
     global card_reader
@@ -132,6 +140,7 @@ def _idle():
     if tag is not None:
         print('Tag data: %s' % pcprox._format_hex(tag[0]))
         print('Bit length: %d' % tag[1])
+        _handle_tag_read()
 
 
 def _disinfecting():
@@ -140,43 +149,43 @@ def _disinfecting():
 
 def _check_device_status():
     global device_active
-    if GPIO.input(PIN_STATUS_DEVICE) == GPIO.LOW:
+    if GPIO.input(PIN_DEVICE) == GPIO.LOW:
         device_active = True
     else:
         device_active = False
 
 
 def _check_door_leds():
-    global status_green_led, status_green_led_prev
-    global status_red_led, status_red_led_prev
+    global state_door_green_led, state_door_green_led_prev
+    global state_door_red_led, state_door_red_led_prev
     
-    status_red_led_prev = status_red_led
-    status_red_led = GPIO.input(PIN_STATUS_DOOR_RED)
-    need_transition_red = (status_red_led != status_red_led_prev)
+    state_door_red_led_prev = state_door_red_led
+    state_door_red_led = GPIO.input(PIN_DOOR_RED_LED)
+    need_transition_red = (state_door_red_led != state_door_red_led_prev)
     if need_transition_red:
-        if status_red_led == GPIO.LOW:
+        if state_door_red_led == GPIO.LOW:
             time_red_led[0] = get_current_time()
         else:
             time_red_led[1] = get_current_time()
         
-    status_green_led_prev = status_green_led
-    status_green_led = GPIO.input(PIN_STATUS_DOOR_GREEN)
-    need_transition_green = (status_green_led != status_green_led_prev)
+    state_door_green_led_prev = state_door_green_led
+    state_door_green_led = GPIO.input(PIN_DOOR_GREEN_LED)
+    need_transition_green = (state_door_green_led != state_door_green_led_prev)
     if need_transition_green:
-        if status_green_led == GPIO.LOW:
+        if state_door_green_led == GPIO.LOW:
             time_green_led[0] = get_current_time()
         else:
             time_green_led[1] = get_current_time()
             
 
 def _check_uv_leds():
-    global status_uv_leds, status_uv_leds_prev
+    global state_uv_leds, state_uv_leds_prev
     
-    status_uv_leds = GPIO.input(PIN_STATUS_UV)
-    need_transition = (status_uv_leds != status_uv_leds_prev)
+    state_uv_leds = GPIO.input(PIN_UV_LED)
+    need_transition = (state_uv_leds != state_uv_leds_prev)
     if need_transition:
-        status_uv_leds_prev = status_uv_leds
-        if status_uv_leds == GPIO.LOW:
+        state_uv_leds_prev = state_uv_leds
+        if state_uv_leds == GPIO.LOW:
             time_uv_leds[0] = get_current_time()
             #print("UV LEDs ON")
         else:
